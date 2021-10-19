@@ -145,8 +145,9 @@ function App() {
         </Modal>
       )}
 
-      <footer className="absolute bottom-0 pl-7 pb-5 px-5 w-full flex justify-between">
+      <footer className="absolute bottom-0 pl-7 pb-5 px-5 w-full flex justify-between pointer-events-none">
         <a
+          className="pointer-events-auto"
           href="https://clipdrop.co?utm_source=cleanup_pictures"
           target="_blank"
           rel="noreferrer"
@@ -158,6 +159,7 @@ function App() {
         </a>
 
         <Button
+          className="pointer-events-auto"
           icon={<ChatAltIcon className="w-6 h-6" />}
           onClick={() =>
             window.open('mailto:contact@cleanup.pictures', '_blank')
