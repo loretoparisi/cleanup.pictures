@@ -50,6 +50,7 @@ export default function Editor(props: EditorProps) {
   const [showBrush, setShowBrush] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const [isInpaintingLoading, setIsInpaintingLoading] = useState(false)
+  const [showSeparator, setShowSeparator] = useState(false)
   const firebase = useFirebase()
 
   const draw = useCallback(() => {
@@ -86,11 +87,11 @@ export default function Editor(props: EditorProps) {
     }
     if (isOriginalLoaded) {
       firebase?.logEvent('image_loaded', {
-        width: original.width,
-        height: original.height,
+        width: original.naturalWidth,
+        height: original.naturalHeight,
       })
-      context.canvas.width = original.width
-      context.canvas.height = original.height
+      context.canvas.width = original.naturalWidth
+      context.canvas.height = original.naturalHeight
       draw()
     }
   }, [context?.canvas, draw, original, isOriginalLoaded, firebase])
@@ -110,8 +111,8 @@ export default function Editor(props: EditorProps) {
     const onPaint = (ev: MouseEvent) => {
       const currLine = lines[lines.length - 1]
       currLine.pts.push({
-        x: ev.pageX - canvas.offsetLeft,
-        y: ev.pageY - canvas.offsetTop,
+        x: ev.offsetX - canvas.offsetLeft,
+        y: ev.offsetY - canvas.offsetTop,
       })
       draw()
     }
@@ -135,8 +136,8 @@ export default function Editor(props: EditorProps) {
         await loadImage(render, res)
         firebase?.logEvent('inpaint_processed', {
           duration: Date.now() - start,
-          width: original.width,
-          height: original.height,
+          width: original.naturalWidth,
+          height: original.naturalHeight,
         })
       } catch (e: any) {
         firebase?.logEvent('inpaint_failed', {
@@ -204,23 +205,52 @@ export default function Editor(props: EditorProps) {
         isInpaintingLoading ? 'animate-pulse-fast pointer-events-none' : '',
       ].join(' ')}
     >
-      <canvas
-        className="rounded-sm"
-        style={showBrush ? { cursor: 'none' } : {}}
-        ref={r => {
-          if (r && !context) {
-            const ctx = r.getContext('2d')
-            if (ctx) {
-              setContext(ctx)
+      <div className="relative">
+        <canvas
+          className="rounded-sm"
+          style={showBrush ? { cursor: 'none' } : {}}
+          ref={r => {
+            if (r && !context) {
+              const ctx = r.getContext('2d')
+              if (ctx) {
+                setContext(ctx)
+              }
             }
-          }
-        }}
-      />
-      {showOriginal ? (
-        <img className="absolute" src={original.src} alt="original" />
-      ) : (
-        <></>
-      )}
+          }}
+        />
+        <div
+          className={[
+            'absolute top-0 right-0 pointer-events-none',
+            'overflow-hidden',
+            'border-primary',
+            showSeparator ? 'border-l-4' : '',
+            // showOriginal ? 'border-opacity-100' : 'border-opacity-0',
+          ].join(' ')}
+          style={{
+            width: showOriginal
+              ? `${Math.round(original.naturalWidth)}px`
+              : '0px',
+            height: original.naturalHeight,
+            transitionProperty: 'width, height',
+            transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            transitionDuration: '300ms',
+          }}
+        >
+          <img
+            className="absolute right-0"
+            src={original.src}
+            alt="original"
+            width={`${original.naturalWidth}px`}
+            height={`${original.naturalHeight}px`}
+            style={{
+              width: `${original.naturalWidth}px`,
+              height: `${original.naturalHeight}px`,
+              maxWidth: 'none',
+            }}
+          />
+        </div>
+      </div>
+
       {showBrush && (
         <div
           className="absolute rounded-full bg-red-500 bg-opacity-50 pointer-events-none"
@@ -233,6 +263,7 @@ export default function Editor(props: EditorProps) {
           }}
         />
       )}
+
       <div className="flex items-center justify-between space-x-5 w-full max-w-4xl py-6">
         <Slider
           label="Brush Size"
@@ -243,8 +274,14 @@ export default function Editor(props: EditorProps) {
         />
         <Button
           icon={<EyeIcon className="w-6 h-6" />}
-          onDown={() => setShowOriginal(true)}
-          onUp={() => setShowOriginal(false)}
+          onDown={() => {
+            setShowSeparator(true)
+            setShowOriginal(true)
+          }}
+          onUp={() => {
+            setShowOriginal(false)
+            setTimeout(() => setShowSeparator(false), 300)
+          }}
         >
           Original
         </Button>
