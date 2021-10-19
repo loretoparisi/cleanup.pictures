@@ -171,7 +171,6 @@ export default function Editor(props: EditorProps) {
       ev.stopPropagation()
       const currLine = lines[lines.length - 1]
       const coords = canvas.getBoundingClientRect()
-      console.log(ev.touches[0], canvas.offsetTop, coords.y)
       currLine.pts.push({
         x: (ev.touches[0].clientX - coords.x) / scale,
         y: (ev.touches[0].clientY - coords.y) / scale,
