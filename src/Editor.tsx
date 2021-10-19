@@ -1,5 +1,6 @@
 import { DownloadIcon, EyeIcon } from '@heroicons/react/outline'
 import React, { useCallback, useEffect, useState } from 'react'
+import { useWindowSize } from 'react-use'
 import { useFirebase } from './adapters/firebase'
 import inpaint from './adapters/inpainting'
 import Button from './components/Button'
@@ -52,6 +53,8 @@ export default function Editor(props: EditorProps) {
   const [isInpaintingLoading, setIsInpaintingLoading] = useState(false)
   const [showSeparator, setShowSeparator] = useState(false)
   const firebase = useFirebase()
+  const [scale, setScale] = useState(1)
+  const windowSize = useWindowSize()
 
   const draw = useCallback(() => {
     if (!context) {
@@ -92,9 +95,16 @@ export default function Editor(props: EditorProps) {
       })
       context.canvas.width = original.naturalWidth
       context.canvas.height = original.naturalHeight
+      const rW = windowSize.width / original.naturalWidth
+      const rH = (windowSize.height - 200) / original.naturalHeight
+      if (rW < 1 || rH < 1) {
+        setScale(Math.min(rW, rH))
+      } else {
+        setScale(1)
+      }
       draw()
     }
-  }, [context?.canvas, draw, original, isOriginalLoaded, firebase])
+  }, [context?.canvas, draw, original, isOriginalLoaded, firebase, windowSize])
 
   // Handle mouse interactions
   useEffect(() => {
@@ -108,21 +118,24 @@ export default function Editor(props: EditorProps) {
     const onMouseMove = (ev: MouseEvent) => {
       setCoords({ x: ev.pageX, y: ev.pageY })
     }
-    const onPaint = (ev: MouseEvent) => {
+    const onPaint = (px: number, py: number) => {
       const currLine = lines[lines.length - 1]
-      currLine.pts.push({
-        x: ev.offsetX - canvas.offsetLeft,
-        y: ev.offsetY - canvas.offsetTop,
-      })
+      currLine.pts.push({ x: px, y: py })
       draw()
     }
-    const onMouseUp = async () => {
+    const onMouseDrag = (ev: MouseEvent) => {
+      const px = ev.offsetX - canvas.offsetLeft
+      const py = ev.offsetY - canvas.offsetTop
+      onPaint(px, py)
+    }
+
+    const onPointerUp = async () => {
       if (!original.src) {
         return
       }
       setIsInpaintingLoading(true)
-      canvas.removeEventListener('mousemove', onPaint)
-      window.removeEventListener('mouseup', onMouseUp)
+      canvas.removeEventListener('mousemove', onMouseDrag)
+      window.removeEventListener('mouseup', onPointerUp)
       refreshCanvasMask()
       try {
         const start = Date.now()
@@ -152,23 +165,44 @@ export default function Editor(props: EditorProps) {
       draw()
     }
     window.addEventListener('mousemove', onMouseMove)
-    canvas.onmouseenter = () => setShowBrush(true)
-    canvas.onmouseleave = () => setShowBrush(false)
-    canvas.onmousedown = e => {
+
+    const onTouchMove = (ev: TouchEvent) => {
+      ev.preventDefault()
+      ev.stopPropagation()
+      const currLine = lines[lines.length - 1]
+      const coords = canvas.getBoundingClientRect()
+      console.log(ev.touches[0], canvas.offsetTop, coords.y)
+      currLine.pts.push({
+        x: (ev.touches[0].clientX - coords.x) / scale,
+        y: (ev.touches[0].clientY - coords.y) / scale,
+      })
+      draw()
+    }
+    const onPointerStart = () => {
       if (!original.src) {
         return
       }
       const currLine = lines[lines.length - 1]
       currLine.size = brushSize
-      canvas.addEventListener('mousemove', onPaint)
-      window.addEventListener('mouseup', onMouseUp)
-      onPaint(e)
+      canvas.addEventListener('mousemove', onMouseDrag)
+      window.addEventListener('mouseup', onPointerUp)
+      // onPaint(e)
     }
 
+    canvas.addEventListener('touchstart', onPointerStart)
+    canvas.addEventListener('touchmove', onTouchMove)
+    canvas.addEventListener('touchend', onPointerUp)
+    canvas.onmouseenter = () => setShowBrush(true)
+    canvas.onmouseleave = () => setShowBrush(false)
+    canvas.onmousedown = onPointerStart
+
     return () => {
-      canvas.removeEventListener('mousemove', onPaint)
+      canvas.removeEventListener('mousemove', onMouseDrag)
       window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('mouseup', onPointerUp)
+      canvas.removeEventListener('touchstart', onPointerStart)
+      canvas.removeEventListener('touchmove', onTouchMove)
+      canvas.removeEventListener('touchend', onPointerUp)
       canvas.onmouseenter = null
       canvas.onmouseleave = null
       canvas.onmousedown = null
@@ -184,8 +218,9 @@ export default function Editor(props: EditorProps) {
     original.src,
     render,
     firebase,
-    original.height,
-    original.width,
+    original.naturalHeight,
+    original.naturalWidth,
+    scale,
   ])
 
   function download() {
@@ -205,7 +240,10 @@ export default function Editor(props: EditorProps) {
         isInpaintingLoading ? 'animate-pulse-fast pointer-events-none' : '',
       ].join(' ')}
     >
-      <div className="relative">
+      <div
+        className={[scale !== 1 ? 'absolute top-0' : 'relative'].join(' ')}
+        style={{ transform: `scale(${scale})` }}
+      >
         <canvas
           className="rounded-sm"
           style={showBrush ? { cursor: 'none' } : {}}
@@ -253,7 +291,7 @@ export default function Editor(props: EditorProps) {
 
       {showBrush && (
         <div
-          className="absolute rounded-full bg-red-500 bg-opacity-50 pointer-events-none"
+          className="hidden sm:block absolute rounded-full bg-red-500 bg-opacity-50 pointer-events-none"
           style={{
             width: `${brushSize}px`,
             height: `${brushSize}px`,
@@ -264,7 +302,15 @@ export default function Editor(props: EditorProps) {
         />
       )}
 
-      <div className="flex items-center justify-between space-x-5 w-full max-w-4xl py-6">
+      <div
+        className={[
+          'flex items-center w-full max-w-4xl py-6',
+          'flex-col space-y-2 sm:space-y-0 sm:flex-row sm:space-x-5',
+          scale !== 1
+            ? 'absolute bottom-0 justify-center'
+            : 'relative justify-between',
+        ].join(' ')}
+      >
         <Slider
           label="Brush Size"
           min={10}

@@ -37,20 +37,21 @@ function App() {
 
   return (
     <div className="min-h-full flex flex-col">
-      <header className="flex px-5 py-3 justify-between items-start">
+      <header className="relative z-10 flex px-5 py-3 justify-between items-center sm:items-start">
         <Button
-          className={file ? '' : 'opacity-0'}
+          className={[file ? '' : 'opacity-0 hidden sm:flex'].join(' ')}
           icon={<ArrowLeftIcon className="w-6 h-6" />}
           onClick={() => {
             firebase.logEvent('start_new')
             setFile(undefined)
           }}
         >
-          Start new
+          <span className="hidden sm:inline">Start new</span>
         </Button>
 
         <Logo />
         <Button
+          className="hidden sm:flex"
           icon={<InformationCircleIcon className="w-6 h-6" />}
           onClick={() => {
             firebase.logEvent('show_modal')
@@ -61,12 +62,12 @@ function App() {
         </Button>
       </header>
 
-      <main className="h-full flex flex-1 flex-col items-center justify-center">
+      <main className="h-full flex flex-1 flex-col items-center justify-center overflow-hidden">
         {file ? (
           <Editor file={file} />
         ) : (
           <>
-            <div className="h-72 w-1/2 max-w-5xl">
+            <div className="h-72 sm:w-1/2 max-w-5xl">
               <FileSelect
                 onSelection={async f => {
                   const {
@@ -85,23 +86,25 @@ function App() {
               />
             </div>
 
-            <div className="flex pt-10 space-x-4 items-center justify-center cursor-pointer">
+            <div className="flex flex-col sm:flex-row pt-10 items-center justify-center cursor-pointer">
               <span className="text-gray-500">Or try with a test image:</span>
+              <div className="flex space-x-2 sm:space-x-4 px-4">
                 {['bag', 'jacket', 'table', 'shoe', 'paris'].map(image => (
-                <div
-                  key={image}
-                  onClick={() => startWithDemoImage(image)}
-                  role="button"
-                  onKeyDown={() => startWithDemoImage(image)}
-                  tabIndex={-1}
-                >
-                  <img
-                    className="rounded-md hover:opacity-75"
-                    src={`exemples/${image}.thumb.jpeg`}
-                    alt={image}
-                  />
-                </div>
-              ))}
+                  <div
+                    key={image}
+                    onClick={() => startWithDemoImage(image)}
+                    role="button"
+                    onKeyDown={() => startWithDemoImage(image)}
+                    tabIndex={-1}
+                  >
+                    <img
+                      className="rounded-md hover:opacity-75"
+                      src={`exemples/${image}.thumb.jpeg`}
+                      alt={image}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}
@@ -145,7 +148,14 @@ function App() {
         </Modal>
       )}
 
-      <footer className="absolute bottom-0 pl-7 pb-5 px-5 w-full flex justify-between pointer-events-none">
+      <footer
+        className={[
+          'absolute bottom-0 pl-7 pb-5 px-5 w-full flex justify-between',
+          'pointer-events-none',
+          // Hide footer when editing on mobile
+          file ? 'hidden lg:flex' : '',
+        ].join(' ')}
+      >
         <a
           className="pointer-events-auto"
           href="https://clipdrop.co?utm_source=cleanup_pictures"
