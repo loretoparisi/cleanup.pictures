@@ -87,7 +87,7 @@ function App() {
 
             <div className="flex pt-10 space-x-4 items-center justify-center cursor-pointer">
               <span className="text-gray-500">Or try with a test image:</span>
-              {['jacket', 'table', 'bag', 'paris'].map(image => (
+                {['bag', 'jacket', 'table', 'shoe', 'paris'].map(image => (
                 <div
                   key={image}
                   onClick={() => startWithDemoImage(image)}
